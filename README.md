@@ -1,5 +1,5 @@
 # Adonis API application
-
+## Node version: 18.15.0
 This is the boilerplate for creating an API server in AdonisJs, it comes pre-configured with.
 
 1. Bodyparser

@@ -22,6 +22,7 @@ Route.get('/', () => {
 
 Route.group(() => {
   Route.post('/', 'UserController.create').validator('StoreUser');
+  Route.post('/login', 'UserController.login');
   Route.get('/', 'UserController.all');
   Route.put('/:id', 'UserController.update');
   Route.delete('/:id', 'UserController.delete');

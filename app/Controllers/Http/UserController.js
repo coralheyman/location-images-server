@@ -1,9 +1,15 @@
 "use strict";
 
+const BadRequestException = use("App/Exceptions/BadRequestException");
+
+const NotFoundException = use("App/Exceptions/NotFoundException");
+const jwt = use("jsonwebtoken");
+const status = use("http-status");
+const Env = use("Env");
+
 const { validate } = use("Validator");
 
 const Firestore = use("App/Models/Firestore");
-
 const firestore = new Firestore();
 const db = firestore.db();
 
@@ -11,6 +17,30 @@ const db = firestore.db();
 const userReference = db.collection("users");
 
 class UserController {
+  async login({ request, response }) {
+    const { email, password } = request.all();
+    const users = await this.getUserByEmail(email);
+    if (users && users.length > 0) {
+      const user = users[0].data();
+      user.id = users[0].id
+      if (user.password !== password) {
+        throw new NotFoundException(`User ${email} not found`, status.OK);
+      } else {
+        const token = jwt.sign(
+          { id: user.id, email },
+          Env.getOrFail("APP_KEY"),
+          { expiresIn: "2h" }
+        );
+        return response.status(200).json({
+          status: true,
+          data: { ...user, token},
+        });
+      }
+    } else {
+      throw new NotFoundException(`User ${email} not found`, status.OK);
+    }
+  }
+
   async create({ request, response }) {
     const data = request.only([
       "name",
@@ -20,7 +50,7 @@ class UserController {
       "password",
     ]);
     const userRef = await this.getUserByEmail(data.email);
-    if (!userRef) {
+    if (userRef.length == 0) {
       let create = await userReference.add({
         name: data.name,
         email: data.email,
@@ -38,7 +68,7 @@ class UserController {
     } else {
       return response.status(201).json({
         status: false,
-        message: `The user with email ${data.email} already exists}`,
+        message: `The user with email ${data.email} already exists`,
         data: null,
       });
     }
@@ -77,27 +107,8 @@ class UserController {
   }
 
   async update({ request, response }) {
-    const rules = {
-      id: "required",
-    };
-
-    const params = request.params
-    const data = request.only([
-      "name",
-      "admin",
-      "identification",
-      "password",
-    ]);
-
-    const validation = await validate(params, rules);
-
-    if (validation.fails()) {
-      return response.status(206).json({
-        status: false,
-        message: validation.messages(),
-        data: null,
-      });
-    }
+    const params = request.params;
+    const data = request.only(["name", "admin", "identification", "password", "email"]);
 
     let user = this.getById(params.id);
 
@@ -106,10 +117,11 @@ class UserController {
       admin: data.admin != undefined ? data.admin : user.admin,
       identification: data.identification ? data.identification : user.identification,
       password: data.password ? data.password : user.password,
+      email: data.email ? data.email : user.email,
     });
 
     if (update) {
-      let user = this.getById(params.id)
+      let user = await this.getById(params.id);
 
       return response.status(201).json({
         status: true,
@@ -120,24 +132,8 @@ class UserController {
   }
 
   async delete({ request, response }) {
-    const rules = {
-      id: "required",
-    };
-
     const data = request.params;
-
-    const validation = await validate(data, rules);
-
-    if (validation.fails()) {
-      return response.status(206).json({
-        status: false,
-        message: validation.messages()[0].message,
-        data: null,
-      });
-    }
-
     const deleted = await userReference.doc(data.id).delete();
-
     return response.status(201).json({
       status: true,
       message: "User deleted successfully",
