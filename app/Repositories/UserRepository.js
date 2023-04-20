@@ -3,7 +3,7 @@ const firestore = new Firestore();
 const db = firestore.db();
 // Reference to
 const userReference = db.collection("users");
-class ValidationLogRepository {
+class UserRepository {
   async getUserByEmail(email) {
     const querySnapshot = await userReference.where("email", "==", email).get();
     return querySnapshot.docs;
@@ -63,4 +63,4 @@ class ValidationLogRepository {
   }
 }
 
-module.exports = ValidationLogRepository;
+module.exports = UserRepository;
