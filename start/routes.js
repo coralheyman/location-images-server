@@ -16,10 +16,6 @@
 /** @type {typeof import('@adonisjs/framework/src/Route/Manager')} */
 const Route = use('Route')
 
-Route.get('/', () => {
-  return { greeting: 'Hello world in JSON' }
-})
-
 Route.group(() => {
   Route.post('/', 'UserController.create').validator('StoreUser');
   Route.post('/login', 'UserController.login');
@@ -27,4 +23,11 @@ Route.group(() => {
   Route.put('/:id', 'UserController.update');
   Route.delete('/:id', 'UserController.delete');
 }).prefix('/api/user')
+
+Route.group(() => {
+  Route.post('/', 'UploadController.create');
+  Route.get('/', 'UploadController.all');
+  Route.put('/:id', 'UploadController.update');
+  Route.delete('/:id', 'UploadController.delete');
+}).prefix('/api/upload')
 

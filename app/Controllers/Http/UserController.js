@@ -1,28 +1,22 @@
 "use strict";
 
-const BadRequestException = use("App/Exceptions/BadRequestException");
-
+const { ioc } = use("@adonisjs/fold");
 const NotFoundException = use("App/Exceptions/NotFoundException");
 const jwt = use("jsonwebtoken");
 const status = use("http-status");
 const Env = use("Env");
 
-const { validate } = use("Validator");
-
-const Firestore = use("App/Models/Firestore");
-const firestore = new Firestore();
-const db = firestore.db();
-
-// Reference to
-const userReference = db.collection("users");
-
 class UserController {
+  constructor() {
+    this.userRespository = ioc.make("App/Repositories/UserRepository");
+  }
+
   async login({ request, response }) {
     const { email, password } = request.all();
-    const users = await this.getUserByEmail(email);
+    const users = await this.userRespository.getUserByEmail(email);
     if (users && users.length > 0) {
       const user = users[0].data();
-      user.id = users[0].id
+      user.id = users[0].id;
       if (user.password !== password) {
         throw new NotFoundException(`User ${email} not found`, status.OK);
       } else {
@@ -33,7 +27,7 @@ class UserController {
         );
         return response.status(200).json({
           status: true,
-          data: { ...user, token},
+          data: { ...user, token },
         });
       }
     } else {
@@ -49,15 +43,9 @@ class UserController {
       "identification",
       "password",
     ]);
-    const userRef = await this.getUserByEmail(data.email);
+    const userRef = await this.userRespository.getUserByEmail(data.email);
     if (userRef.length == 0) {
-      let create = await userReference.add({
-        name: data.name,
-        email: data.email,
-        admin: data.admin,
-        identification: data.identification,
-        password: data.password,
-      });
+      let create = await this.userRespository.createUser(data);
       if (create) {
         return response.status(201).json({
           status: true,
@@ -74,31 +62,8 @@ class UserController {
     }
   }
 
-  async getUserByEmail(email) {
-    const querySnapshot = await userReference.where("email", "==", email).get();
-    return querySnapshot.docs;
-  }
-
-  async getById(id) {
-    let getUser = await userReference.doc(id).get();
-    return getUser.data();
-  }
-
   async all({ response }) {
-    let users = [];
-
-    await userReference.get().then((snapshot) => {
-      snapshot.forEach((doc) => {
-        let id = doc.id;
-        let user = doc.data();
-
-        users.push({
-          id,
-          ...user,
-        });
-      });
-    });
-
+    const users = await this.userRespository.all();
     return response.status(201).json({
       status: true,
       message: "All users",
@@ -108,32 +73,28 @@ class UserController {
 
   async update({ request, response }) {
     const params = request.params;
-    const data = request.only(["name", "admin", "identification", "password", "email"]);
+    const data = request.only([
+      "name",
+      "admin",
+      "identification",
+      "password",
+      "email",
+    ]);
 
-    let user = this.getById(params.id);
+    let user = await this.userRespository.getById(params.id);
 
-    let update = await userReference.doc(params.id).update({
-      name: data.name ? data.name : user.name,
-      admin: data.admin != undefined ? data.admin : user.admin,
-      identification: data.identification ? data.identification : user.identification,
-      password: data.password ? data.password : user.password,
-      email: data.email ? data.email : user.email,
+    let userUpdated = await this.userRespository.update(params.id, data, user);
+
+    return response.status(201).json({
+      status: true,
+      message: "User updated successfully",
+      data: userUpdated,
     });
-
-    if (update) {
-      let user = await this.getById(params.id);
-
-      return response.status(201).json({
-        status: true,
-        message: "User updated successfully",
-        data: user,
-      });
-    }
   }
 
   async delete({ request, response }) {
     const data = request.params;
-    const deleted = await userReference.doc(data.id).delete();
+    const deleted = await this.userRespository.delete(data.id);
     return response.status(201).json({
       status: true,
       message: "User deleted successfully",
